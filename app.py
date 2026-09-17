@@ -1,5 +1,4 @@
 # cell 1
-# Rubric mapping: Code Submission (11)
 # 1. Install NumPy FIRST and force the older version to prevent binary incompatibility errors
 !pip install -q "numpy<2.0.0" --force-reinstall
 
@@ -15,7 +14,7 @@ import numpy as np
 
 print("-" * 50)
 print(f"Python Version: {sys.version}")
-print(f"NumPy Version: {np.__version__}") # Verify this is 1.26.x
+print(f"NumPy Version: {np.__version__}")  # Verify this is 1.26.x
 print(f"PyTorch Version: {torch.__version__}")
 
 # GPU Check & Assertion
@@ -33,7 +32,6 @@ print("-" * 50)
 print("Environment setup complete.")
 
 # cell 2
-# Rubric mapping: Code Submission (11), Fine-Tune strategy (7)
 import os
 import random
 import numpy as np
@@ -44,17 +42,17 @@ from pathlib import Path
 @dataclass
 class CFG:
     # Model Architecture
-    model_name: str = "google/flan-t5-small" # Efficient for T4, switch to 'base' if resources allow
+    model_name: str = "google/flan-t5-small"  # Efficient for T4, switch to 'base' if resources allow
 
     # Data / Tokenizer
     max_source_len: int = 512
     max_target_len: int = 128
 
     # Training Hyperparameters (T4 Friendly)
-    learning_rate: float = 3e-4 # Standard for fine-tuning
+    learning_rate: float = 3e-4  # Standard for fine-tuning
     batch_size: int = 8
-    epochs: int = 3 # PDF requires explicit epochs
-    grad_accum_steps: int = 4 # Effective batch size = 32
+    epochs: int = 3  # Number of training epochs
+    grad_accum_steps: int = 4  # Effective batch size = 32
     warmup_steps: int = 100
     seed: int = 42
 
@@ -90,7 +88,6 @@ for d in [config.output_dir, config.metrics_dir, config.model_save_dir]:
     print(f"Created/Verified directory: {d}")
 
 # cell 3
-# Rubric mapping: Fine-Tune strategy (7), Coursework goal (1)
 from datasets import load_dataset, DatasetDict
 
 def load_amazon_summarization_data():
@@ -101,7 +98,7 @@ def load_amazon_summarization_data():
     """
     print("Loading Amazon Polarity dataset from Hugging Face Hub...")
 
-    # We load a small subset (10,000) to keep T4 memory safe and training fast
+    # Load a small subset (10,000) to keep T4 memory safe and training fast
     # 'train[:10000]' ensures reproducibility and prevents OOM errors
     raw_data = load_dataset("amazon_polarity", split="train[:10000]")
 
@@ -134,8 +131,7 @@ print("-" * 30)
 print("Example Review (Input):", raw_dataset['train'][0]['text'][:150] + "...")
 print("Example Title (Target):", raw_dataset['train'][0]['summary'])
 
-#cell 4
-# Rubric mapping: Baseline setup (3), Prompt Engineering (5)
+# cell 4
 from transformers import AutoTokenizer
 
 print(f"Loading tokenizer for: {config.model_name}")
@@ -153,7 +149,7 @@ def preprocess_function(examples):
     # Tokenize input text (Review content)
     model_inputs = tokenizer(
         inputs,
-        max_length=config.max_source_len, # 512 as per CFG
+        max_length=config.max_source_len,  # 512 as per CFG
         truncation=True,
         padding="max_length"
     )
@@ -161,7 +157,7 @@ def preprocess_function(examples):
     # Tokenize target text (Review Title)
     labels = tokenizer(
         text_target=examples["summary"],
-        max_length=config.max_target_len, # 128 as per CFG
+        max_length=config.max_target_len,  # 128 as per CFG
         truncation=True,
         padding="max_length"
     )
@@ -179,7 +175,6 @@ print("Preprocessing complete.")
 print(f"Train dataset size: {len(tokenized_dataset['train'])}")
 
 # cell 5
-# Rubric mapping: Generate Baseline (3)
 from transformers import AutoModelForSeq2SeqLM, GenerationConfig
 import pandas as pd
 import torch
@@ -188,7 +183,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 print(f"Loading baseline model: {config.model_name} to {device}")
 
-# We load in float32 for better compatibility with the fix
+# Load in float32 for better compatibility
 baseline_model = AutoModelForSeq2SeqLM.from_pretrained(
     config.model_name
 ).to(device)
@@ -224,7 +219,7 @@ def generate_summaries(model, dataset, prompt_template, num_samples=20):
                 max_new_tokens=50,
                 do_sample=False,
                 repetition_penalty=1.2,
-                use_cache=False # Double-check cache is off during generation
+                use_cache=False  # Double-check cache is off during generation
             )
 
         generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -240,11 +235,9 @@ def generate_summaries(model, dataset, prompt_template, num_samples=20):
 print("✅ Fix applied. Baseline model and helper ready.")
 
 # cell 6
-# Rubric mapping: Generate Baseline (3)
 import os
 
-# 1. Define 3 standard/default baseline prompts as per PDF requirements
-# These are simple, direct instructions without specific styling or constraints
+# 1. Define 3 standard baseline prompts
 baseline_prompt_templates = [
     "Summarize the following review:",
     "Provide a brief title for this text:",
@@ -252,13 +245,11 @@ baseline_prompt_templates = [
 ]
 
 # 2. Select the primary baseline prompt for the evaluation
-# We use the first one as our 'Official Baseline'
 primary_baseline_prompt = baseline_prompt_templates[0]
 
 print(f"Running Baseline Generation using prompt: '{primary_baseline_prompt}'")
 
 # 3. Generate summaries for 20 samples from the test set
-# This ensures we have enough data for a meaningful initial evaluation
 df_baseline = generate_summaries(
     model=baseline_model,
     dataset=raw_dataset['test'],
@@ -266,25 +257,23 @@ df_baseline = generate_summaries(
     num_samples=20
 )
 
-# 4. Save results to /content/outputs as required by the TA-Engineer persona
+# 4. Save results to /content/outputs
 save_path = f"{config.output_dir}/baseline_generations.csv"
 df_baseline.to_csv(save_path, index=False)
 
 print(f"\n✅ Baseline generation complete. Results saved to: {save_path}")
 
-# 5. Display the first 5 results for qualitative inspection (Rubric: 'present representative outputs')
+# 5. Display the first 5 results for qualitative inspection
 print("\n--- SAMPLE BASELINE OUTPUTS ---")
 print(df_baseline[['reference', 'generated']].head(5))
 
 # cell 8
-# Rubric mapping: Quantitative Evaluation (6)
 import evaluate
 import numpy as np
 import pandas as pd
 
 # 1. Load the evaluation metrics
 # ROUGE measures word overlap; BERTScore measures semantic meaning
-# We install rouge_score here just in case it was missed earlier
 !pip install -q rouge_score
 rouge_metric = evaluate.load("rouge")
 bertscore_metric = evaluate.load("bertscore")
@@ -335,12 +324,10 @@ print(f"✅ Baseline metrics saved to: {metrics_save_path}")
 print(metrics_df.to_string(index=False))
 
 # cell 9
-# Rubric mapping: Prompt Engineering (5)
 import pandas as pd
 import os
 
 # 1. Define Advanced Prompt Strategies
-# We use 'text' as a placeholder for the few-shot template
 prompt_strategies = {
     "Zero-Shot (Refined)": "Task: Summarize the following Amazon product review into a short, catchy headline of less than 10 words.\nReview:",
     "Few-Shot (2-Shot)": (
@@ -366,19 +353,16 @@ for name, template in prompt_strategies.items():
         else:
             full_prompt = f"{template} {review_text}"
 
-
         # Tokenize and Generate
         inputs = tokenizer(full_prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
 
         with torch.no_grad():
-            # ADDED use_cache=False HERE TO FIX THE ERROR
+            # Disable cache to avoid compatibility issues
             outputs = baseline_model.generate(
                 **inputs,
                 max_new_tokens=30,
                 use_cache=False
             )
-
-# ... (rest of your code below remains the same)
 
         # Store results in a list of dictionaries
         all_prompt_data.append({
@@ -391,8 +375,7 @@ for name, template in prompt_strategies.items():
 print("\nConsolidating all results...")
 comparison_list = []
 
-# A. Add the Baseline from Cell 7
-# Use .copy() to ensure we don't mess up the original baseline variable
+# A. Add the baseline metrics
 base_row = baseline_metrics.copy()
 base_row['Strategy'] = "Original Baseline"
 comparison_list.append(base_row)
@@ -403,7 +386,7 @@ prompt_results_df = pd.DataFrame(all_prompt_data)
 for name in prompt_strategies.keys():
     # Filter the data for just this one strategy
     subset = prompt_results_df[prompt_results_df['Strategy'] == name]
-    # Call our fixed function from Cell 7
+    # Call the metrics function
     scores = calculate_metrics(subset)
     scores['Strategy'] = name
     comparison_list.append(scores)
@@ -423,13 +406,11 @@ print("="*50)
 print(comparison_df.to_string(index=False))
 
 # cell 10
-# Rubric mapping: Fine-tuning (7)
 import sys
 import os
 import torch
 
-# 1. THE TRITON SHIELD:
-# This stops bitsandbytes from trying to load the broken triton module
+# 1. Bypass triton module to avoid import errors
 sys.modules["triton"] = None
 sys.modules["triton.ops"] = None
 
@@ -452,7 +433,6 @@ lora_config = LoraConfig(
 baseline_model.to(torch.float32)
 
 # 4. Wrap the model
-# Now that 'triton' is blocked in sys.modules, this should run normally
 peft_model = get_peft_model(baseline_model, lora_config)
 
 # 5. Setup Trainer
@@ -491,12 +471,9 @@ print("✅ SUCCESS! The Triton error has been bypassed.")
 print(f"Trainable params: {sum(p.numel() for p in peft_model.parameters() if p.requires_grad)}")
 
 # cell 11
-# Rubric mapping: Fine-tuning (7)
-
 print("Starting Fine-Tuning... This will take roughly 5-10 minutes.")
 
 # 1. Start the training process
-# You will see a progress bar and loss metrics appear here
 trainer.train()
 
 # 2. Save the adapter weights (the 'learned' part of the model)
@@ -507,7 +484,6 @@ tokenizer.save_pretrained(peft_model_id)
 print(f"\n✅ Training complete! Fine-tuned weights saved to: {peft_model_id}")
 
 # cell 12
-# Rubric mapping: Quantitative Evaluation (6)
 import torch
 import gc
 from tqdm import tqdm
@@ -519,12 +495,11 @@ trainer.model.to("cpu")
 torch.cuda.empty_cache()
 gc.collect()
 
-# 2. Manual Inference Loop (Very stable)
+# 2. Manual Inference Loop
 preds = []
 labels = []
 
-# We'll test on a subset of 100 samples to keep it fast on CPU
-# This is plenty for a statistically significant ROUGE score comparison
+# Test on a subset of 100 samples
 test_subset = tokenized_dataset["test"].select(range(min(100, len(tokenized_dataset["test"]))))
 
 print(f"Generating summaries for {len(test_subset)} samples...")
@@ -537,7 +512,7 @@ for example in tqdm(test_subset):
         output_ids = trainer.model.generate(
             input_ids=input_ids,
             max_new_tokens=30,
-            use_cache=False # Consistent with our fix from earlier
+            use_cache=False  # Disable cache for stability
         )
 
     # Decode
@@ -573,8 +548,6 @@ print(final_comparison_df.to_string(index=False))
 final_comparison_df.to_csv(f"{config.metrics_dir}/final_model_comparison.csv", index=False)
 
 # cell 13
-# Rubric mapping: Qualitative Evaluation (6)
-
 def generate_headline(review_text):
     # Move model back to CPU if it isn't already there to be safe
     trainer.model.to("cpu")
